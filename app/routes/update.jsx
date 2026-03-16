@@ -1,4 +1,4 @@
-import { json } from "@shopify/remix-oxygen";
+import { data } from "react-router";
 import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
@@ -11,33 +11,36 @@ export async function action({ request }) {
     const customerEmail = formData.get("customer_email");
 
     if (!handle || !newUrl || !customerEmail) {
-      return json({ error: "Missing required fields" }, { status: 400 });
+      return data({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const lookupResponse = await admin.graphql(`
-      query GetMetaobjectByHandle($handle: MetaobjectHandleInput!) {
-        metaobjectByHandle(handle: $handle) {
-          id
-          fields {
-            key
-            value
+    const lookupResponse = await admin.graphql(
+      `#graphql
+        query GetMetaobjectByHandle($handle: MetaobjectHandleInput!) {
+          metaobjectByHandle(handle: $handle) {
+            id
+            fields {
+              key
+              value
+            }
           }
         }
-      }
-    `, {
-      variables: {
-        handle: {
-          type: "customer_qr_links",
-          handle,
+      `,
+      {
+        variables: {
+          handle: {
+            type: "customer_qr_links",
+            handle,
+          },
         },
-      },
-    });
+      }
+    );
 
     const lookupJson = await lookupResponse.json();
     const metaobject = lookupJson?.data?.metaobjectByHandle;
 
     if (!metaobject) {
-      return json({ error: "QR link not found" }, { status: 404 });
+      return data({ error: "QR link not found" }, { status: 404 });
     }
 
     const fieldMap = Object.fromEntries(
@@ -48,42 +51,45 @@ export async function action({ request }) {
       fieldMap.customer_email &&
       fieldMap.customer_email.toLowerCase() !== customerEmail.toLowerCase()
     ) {
-      return json({ error: "Unauthorized update attempt" }, { status: 403 });
+      return data({ error: "Unauthorized update attempt" }, { status: 403 });
     }
 
-    const updateResponse = await admin.graphql(`
-      mutation UpdateMetaobject($id: ID!, $metaobject: MetaobjectUpdateInput!) {
-        metaobjectUpdate(id: $id, metaobject: $metaobject) {
-          metaobject { id }
-          userErrors { field message }
+    const updateResponse = await admin.graphql(
+      `#graphql
+        mutation UpdateMetaobject($id: ID!, $metaobject: MetaobjectUpdateInput!) {
+          metaobjectUpdate(id: $id, metaobject: $metaobject) {
+            metaobject { id }
+            userErrors { field message }
+          }
         }
-      }
-    `, {
-      variables: {
-        id: metaobject.id,
-        metaobject: {
-          fields: [
-            {
-              key: "qr_target_url",
-              value: newUrl,
-            },
-          ],
+      `,
+      {
+        variables: {
+          id: metaobject.id,
+          metaobject: {
+            fields: [
+              {
+                key: "qr_target_url",
+                value: newUrl,
+              },
+            ],
+          },
         },
-      },
-    });
+      }
+    );
 
     const updateJson = await updateResponse.json();
 
     if (updateJson.data.metaobjectUpdate.userErrors.length > 0) {
-      return json(
+      return data(
         { error: updateJson.data.metaobjectUpdate.userErrors[0].message },
         { status: 400 }
       );
     }
 
-    return json({ success: true });
+    return data({ success: true });
   } catch (error) {
     console.error("QR update error:", error);
-    return json({ error: "Server error" }, { status: 500 });
+    return data({ error: "Server error" }, { status: 500 });
   }
 }
