@@ -1,14 +1,21 @@
 import { data } from "react-router";
 import { authenticate } from "../shopify.server";
+import { shopifyApi, LATEST_API_VERSION } from "@shopify/shopify-api";
 
 export async function action({ request }) {
   try {
-    const { admin } = await authenticate.public.appProxy(request);
+    const { session, shop } = await authenticate.public.appProxy(request);
 
-    const formData = await request.formData();
-    const handle = formData.get("metaobject_handle");
-    const newUrl = formData.get("qr_target_url");
-    const customerEmail = formData.get("customer_email");
+    const client = new shopifyApi({
+      apiKey: process.env.SHOPIFY_API_KEY,
+      apiSecretKey: process.env.SHOPIFY_API_SECRET,
+      scopes: process.env.SCOPES.split(","),
+      hostName: process.env.SHOPIFY_APP_URL.replace(/^https:\/\//, ""),
+      apiVersion: LATEST_API_VERSION,
+      isEmbeddedApp: true,
+    });
+
+    const admin = new client.clients.Graphql({ session });
 
     if (!handle || !newUrl || !customerEmail) {
       return data({ error: "Missing required fields" }, { status: 400 });
