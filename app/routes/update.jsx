@@ -15,27 +15,8 @@ export async function action({ request }) {
       return data({ error: "Missing shop context" }, { status: 400 });
     }
 
-    const adminContext = await shopify.unauthenticated.admin(shop);
+const { admin } = await shopify.unauthenticated.admin(shop);
 
-console.log("adminContext keys:", Object.keys(adminContext || {}));
-console.log("session exists:", !!adminContext?.session);
-console.log("session shop:", adminContext?.session?.shop);
-console.log("access token exists:", !!adminContext?.session?.accessToken);
-
-const { admin } = adminContext;
-
-const scopeCheckResponse = await admin.graphql(
-  `#graphql
-  query {
-    currentAppInstallation {
-      accessScopes {
-        handle
-      }
-    }
-  }`
-);
-
-const scopeCheckJson = await scopeCheckResponse.json();
 console.log(
   "granted scopes:",
   scopeCheckJson?.data?.currentAppInstallation?.accessScopes || []
