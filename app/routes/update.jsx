@@ -4,7 +4,12 @@ import shopify from "../shopify.server";
 export async function action({ request }) {
   try {
     const proxyContext = await shopify.authenticate.public.appProxy(request);
-    const shop = proxyContext.shop;
+    const url = new URL(request.url);
+
+    const shop =
+      proxyContext?.shop ||
+      url.searchParams.get("shop") ||
+      url.searchParams.get("logged_in_customer_shop_domain");
 
     if (!shop) {
       return data({ error: "Missing shop context" }, { status: 400 });
