@@ -17,10 +17,6 @@ export async function action({ request }) {
 
 const { admin } = await shopify.unauthenticated.admin(shop);
 
-console.log(
-  "granted scopes:",
-  scopeCheckJson?.data?.currentAppInstallation?.accessScopes || []
-);
 
     const formData = await request.formData();
     const handle = String(formData.get("metaobject_handle") || "").trim();
