@@ -147,7 +147,10 @@ console.log(
 
     // 2) Build the Shopify redirect path
     // Adjust this if your actual QR path format is different.
-    const redirectPath = `/qr/${handle}`;
+    const redirectPath = String(fieldMap.qr_redirect_path || "").trim();
+	if (!redirectPath || !redirectPath.startsWith("/")) {
+      return data({ error: "Invalid QR redirect path." }, { status: 400 });
+    }
 
     // 3) Look up existing Shopify URL Redirect by path
     const redirectLookupResponse = await admin.graphql(
