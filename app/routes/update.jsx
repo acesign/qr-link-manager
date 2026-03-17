@@ -114,8 +114,13 @@ export async function action({ request }) {
         { status: 400 }
       );
     }
-
-    return data({ success: true });
+	return new Response(null, {
+  	status: 302,
+  	headers: {
+    	Location: "/pages/manage-my-qr-links?success=1",
+  	},
+	});
+    
   } catch (error) {
     console.error("QR update error:", error);
     return data(
