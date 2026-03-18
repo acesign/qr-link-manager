@@ -237,12 +237,11 @@ const { admin } = await shopify.unauthenticated.admin(shop);
       }
     }
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: "/pages/manage-my-qr-links?success=1",
-      },
-    });
+  return data({
+  success: true,
+  message: "QR link updated successfully.",
+});
+
   } catch (error) {
     console.error("QR update error:", error);
     return data(
