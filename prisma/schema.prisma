@@ -32,3 +32,18 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model QrReservation {
+  id           String   @id @default(cuid())
+  qrId         String   @unique
+  qrPath       String   @unique
+  qrPublicUrl  String   @unique
+  status       String   @default("reserved")
+  customerId   String?
+  customerEmail String?
+  sessionId    String?
+  cartToken    String?
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
