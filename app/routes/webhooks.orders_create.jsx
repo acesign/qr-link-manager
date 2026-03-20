@@ -4,11 +4,22 @@ import shopify from "../shopify.server";
 const PLACEHOLDER_TARGET_URL = "https://explore.homes/pages/coming-soon";
 const METAOBJECT_TYPE = "customer_qr_links";
 
-function getPropertyValue(properties = [], targetName) {
-  const match = properties.find((prop) => prop?.name === targetName);
-  return String(match?.value || "").trim();
-}
+function getPropertyValue(properties, targetName) {
+  if (!properties) return "";
 
+  if (Array.isArray(properties)) {
+    const match = properties.find(
+      (prop) => prop?.name === targetName || prop?.key === targetName
+    );
+    return String(match?.value || "").trim();
+  }
+
+  if (typeof properties === "object") {
+    return String(properties[targetName] || "").trim();
+  }
+
+  return "";
+}
 function normalizeQrId(qrId) {
   return String(qrId || "").replace(/-/g, "").trim().toUpperCase();
 }
@@ -191,6 +202,9 @@ async function createCustomerQrMetaobject({
 export async function action({ request }) {
   try {
     const { topic, shop, payload, admin } = await shopify.authenticate.webhook(request);
+	console.log("orders/create webhook received");
+	console.log("Topic:", topic);
+	console.log("Order name:", payload?.name);
 
     if (topic !== "ORDERS_CREATE") {
       return data({ ok: true, ignored: true });
@@ -202,31 +216,40 @@ export async function action({ request }) {
     const customerEmail = String(order?.email || order?.customer?.email || "").trim().toLowerCase();
     const orderName = String(order?.name || "").trim();
 
-    for (const item of lineItems) {
-      const properties = item?.properties || [];
+for (const item of lineItems) {
+  console.log("Webhook line item properties:", JSON.stringify(item?.properties, null, 2));
 
-      const qrRawId = normalizeQrId(getPropertyValue(properties, "qr_raw_id"));
-      const qrLink = getPropertyValue(properties, "qr_link");
+  const properties = item?.properties || {};
+  const qrRawId = normalizeQrId(getPropertyValue(properties, "qr_raw_id"));
+  const qrLink = getPropertyValue(properties, "qr_link");
+  const qrDisplayId = getPropertyValue(properties, "qr_id");
 
-      if (!qrRawId || !qrLink) {
-        continue;
-      }
+  console.log("Extracted QR values:", {
+    qrRawId,
+    qrLink,
+    qrDisplayId,
+  });
 
-      const redirectPath = `/qr/${qrRawId}`;
+  if (!qrRawId || !qrLink) {
+    console.log("Skipping line item because QR values were missing.");
+    continue;
+  }
 
-      await createOrUpdateRedirect(admin, redirectPath, PLACEHOLDER_TARGET_URL);
+  const redirectPath = `/qr/${qrRawId}`;
 
-      await createCustomerQrMetaobject({
-        admin,
-        qrId: qrRawId,
-        qrLink,
-        customerId,
-        customerEmail,
-        orderName,
-      });
+  await createOrUpdateRedirect(admin, redirectPath, PLACEHOLDER_TARGET_URL);
 
-      console.log(`Created QR setup for order ${orderName}: ${qrRawId} (${shop})`);
-    }
+  await createCustomerQrMetaobject({
+    admin,
+    qrId: qrRawId,
+    qrLink,
+    customerId,
+    customerEmail,
+    orderName,
+  });
+
+  console.log(`Created QR setup for order ${orderName}: ${qrRawId} (${shop})`);
+}
 
     return data({ ok: true });
   } catch (error) {
