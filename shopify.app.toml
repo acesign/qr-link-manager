@@ -2,7 +2,7 @@
 
 client_id = "b30f504e0a4f4cbdd18f36e2c7367232"
 name = "QR Link Manager"
-application_url = "https://example.com"
+application_url = "https://qr-link-manager-production.up.railway.app"
 embedded = true
 
 [build]
@@ -19,9 +19,12 @@ api_version = "2026-01"
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders_create"
+
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_metaobjects,write_metaobjects,write_online_store_navigation,write_metaobject_definitions,write_products"
+scopes = "read_orders,read_metaobjects,write_metaobjects,write_online_store_navigation,write_metaobject_definitions,write_products"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 
@@ -29,7 +32,7 @@ use_legacy_install_flow = false
 redirect_urls = [ ]
 
 [app_proxy]
-url = "https://example.com/apps/qr-links"
+url = "https://qr-link-manager-production.up.railway.app"
 subpath = "qr-links"
 prefix = "apps"
 
