@@ -47,3 +47,77 @@ model QrReservation {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model QrCode {
+  id                String   @id @default(cuid())
+  shop              String
+  qrCode            String   @unique
+  qrDisplayCode     String?
+  qrPath            String   @unique
+  publicUrl         String?
+
+  status            QrStatus @default(RESERVED)
+
+  reservationId     String?  @unique
+  orderId           String?
+  orderName         String?
+  orderLineItemId   String?
+  customerId        String?
+  customerEmail     String?
+
+  targetUrl         String?
+  redirectGid       String?
+  metaobjectId      String?
+  metaobjectHandle  String?
+
+  reservedAt        DateTime?
+  activatedAt       DateTime?
+  lastScannedAt     DateTime?
+  scanCount         Int      @default(0)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  scans             QrScan[]
+
+  @@index([shop, orderId])
+  @@index([shop, customerId])
+  @@index([shop, status])
+  @@index([shop, orderLineItemId])
+}
+
+model ProcessedWebhook {
+  id               String   @id @default(cuid())
+  shop             String
+  topic            String
+  webhookId        String
+  orderId          String?
+  processedAt      DateTime @default(now())
+
+  @@unique([shop, webhookId])
+  @@index([shop, topic, orderId])
+}
+
+model QrScan {
+  id          String   @id @default(cuid())
+  qrCodeId    String
+  scannedAt   DateTime @default(now())
+  referer     String?
+  userAgent   String?
+  ipHash      String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+
+  qrCode      QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+
+  @@index([qrCodeId, scannedAt])
+}
+
+enum QrStatus {
+  RESERVED
+  PENDING
+  ACTIVE
+  DISABLED
+  EXPIRED
+}

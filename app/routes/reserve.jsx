@@ -14,7 +14,7 @@ export async function action({ request }) {
       url.searchParams.get("logged_in_customer_shop_domain");
 
     if (!shop) {
-      return data({ error: "Missing shop context" }, { status: 400 });
+      return data({ success: false, error: "Missing shop context" }, { status: 400 });
     }
 
     const baseUrl = "https://explore.homes";
@@ -22,21 +22,27 @@ export async function action({ request }) {
     const { qrId, qrPath, qrPublicUrl } =
       await generateUniqueQrReservation(baseUrl);
 
-    const reservation = await prisma.qrReservation.create({
+    const qrDisplayId = formatQrId(qrId);
+
+    const reservation = await prisma.qrCode.create({
       data: {
-        qrId,
+        shop,
+        qrCode: qrId,
+        qrDisplayCode: qrDisplayId,
         qrPath,
-        qrPublicUrl,
-        status: "reserved",
+        publicUrl: qrPublicUrl,
+        status: "RESERVED",
+        reservedAt: new Date(),
+        targetUrl: null,
       },
     });
 
     return data({
       success: true,
-      qrId: reservation.qrId,
-      qrDisplayId: formatQrId(reservation.qrId),
+      qrId: reservation.qrCode,
+      qrDisplayId: reservation.qrDisplayCode,
       qrPath: reservation.qrPath,
-      qrPublicUrl: reservation.qrPublicUrl,
+      qrPublicUrl: reservation.publicUrl,
       shop,
     });
   } catch (error) {

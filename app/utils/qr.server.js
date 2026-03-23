@@ -23,9 +23,8 @@ export async function generateUniqueQrReservation(baseUrl) {
     const qrPath = `/qr/${qrId}`;
     const qrPublicUrl = `${baseUrl}${qrPath}`;
 
-    const existing = await prisma.qrReservation.findFirst({
-      where: {
-        OR: [{ qrId }, { qrPath }, { qrPublicUrl }],
+    const existing = await prisma.qrCode.findUnique({
+      where: { qrCode: qrId }
       },
     });
 
