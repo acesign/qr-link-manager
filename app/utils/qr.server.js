@@ -1,35 +1,38 @@
 import prisma from "../db.server";
 
-const QR_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-export function generateQrId(length = 6) {
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * QR_ID_CHARS.length);
-    result += QR_ID_CHARS[randomIndex];
-  }
-  return result;
-}
+const QR_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export function formatQrId(qrId) {
+  if (!qrId || qrId.length !== 6) return qrId;
   return `${qrId.slice(0, 3)}-${qrId.slice(3)}`;
 }
 
-export async function generateUniqueQrReservation(baseUrl) {
-  const maxAttempts = 20;
+function generateQrId(length = 6) {
+  let result = "";
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const qrId = generateQrId(6);
+  for (let i = 0; i < length; i++) {
+    result += QR_CHARS.charAt(Math.floor(Math.random() * QR_CHARS.length));
+  }
+
+  return result;
+}
+
+export async function generateUniqueQrReservation(baseUrl) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const qrId = generateQrId();
     const qrPath = `/qr/${qrId}`;
     const qrPublicUrl = `${baseUrl}${qrPath}`;
 
     const existing = await prisma.qrCode.findUnique({
-      where: { qrCode: qrId }
-      },
+      where: { qrCode: qrId },
     });
 
     if (!existing) {
-      return { qrId, qrPath, qrPublicUrl };
+      return {
+        qrId,
+        qrPath,
+        qrPublicUrl,
+      };
     }
   }
 
