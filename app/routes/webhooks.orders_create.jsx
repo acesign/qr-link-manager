@@ -184,6 +184,11 @@ async function createCustomerQrMetaobject({
         metaobject: {
           type: METAOBJECT_TYPE,
           fields,
+		capabilities: {
+		publishable: {
+		status: "ACTIVE"
+		}
+		}
         },
       },
     }
