@@ -1,7 +1,8 @@
 import { data } from "react-router";
 import shopify from "../shopify.server";
+import prisma from "../db.server";
 
-const PLACEHOLDER_TARGET_URL = "https://explore.homes/pages/coming-soon";
+const PLACEHOLDER_TARGET_URL = "https://explore.homes/pages/livelink-qr-setup-1";
 const METAOBJECT_TYPE = "customer_qr_links";
 
 function getPropertyValue(properties, targetName) {
@@ -20,6 +21,7 @@ function getPropertyValue(properties, targetName) {
 
   return "";
 }
+
 function normalizeQrId(qrId) {
   return String(qrId || "").replace(/-/g, "").trim().toUpperCase();
 }
@@ -140,9 +142,6 @@ async function createCustomerQrMetaobject({
 }) {
   const redirectPath = `/qr/${qrId}`;
 
-  // IMPORTANT:
-  // These field keys must exactly match your Shopify metaobject field keys.
-  // Update these keys if your definition uses different keys.
   const fields = [
     { key: "qr_id", value: qrId },
     { key: "qr_redirect_path", value: redirectPath },
@@ -184,11 +183,11 @@ async function createCustomerQrMetaobject({
         metaobject: {
           type: METAOBJECT_TYPE,
           fields,
-		capabilities: {
-		publishable: {
-		status: "ACTIVE"
-		}
-		}
+          capabilities: {
+            publishable: {
+              status: "ACTIVE",
+            },
+          },
         },
       },
     }
@@ -207,9 +206,10 @@ async function createCustomerQrMetaobject({
 export async function action({ request }) {
   try {
     const { topic, shop, payload, admin } = await shopify.authenticate.webhook(request);
-	console.log("orders/create webhook received");
-	console.log("Topic:", topic);
-	console.log("Order name:", payload?.name);
+
+    console.log("orders/create webhook received");
+    console.log("Topic:", topic);
+    console.log("Order name:", payload?.name);
 
     if (topic !== "ORDERS_CREATE") {
       return data({ ok: true, ignored: true });
@@ -218,47 +218,87 @@ export async function action({ request }) {
     const order = payload;
     const lineItems = order?.line_items || [];
     const customerId = order?.customer?.id ? String(order.customer.id) : "";
-    const customerEmail = String(order?.email || order?.customer?.email || "").trim().toLowerCase();
+    const customerEmail = String(order?.email || order?.customer?.email || "")
+      .trim()
+      .toLowerCase();
     const orderName = String(order?.name || "").trim();
+    const orderId = order?.id ? String(order.id) : "";
 
-for (const item of lineItems) {
-  console.log("Webhook line item properties:", JSON.stringify(item?.properties, null, 2));
+    for (const item of lineItems) {
+      console.log("Webhook line item properties:", JSON.stringify(item?.properties, null, 2));
 
-  const properties = item?.properties || {};
-  const qrRawId = normalizeQrId(getPropertyValue(properties, "qr_raw_id"));
-  const qrLink = getPropertyValue(properties, "qr_link");
-  const qrDisplayId = getPropertyValue(properties, "qr_id");
+      const properties = item?.properties || {};
+      const qrRawId = normalizeQrId(getPropertyValue(properties, "qr_raw_id"));
+      const qrLink = getPropertyValue(properties, "qr_link");
+      const qrDisplayId = getPropertyValue(properties, "qr_id");
+      const orderLineItemId = item?.id ? String(item.id) : "";
 
-  console.log("Extracted QR values:", {
-    qrRawId,
-    qrLink,
-    qrDisplayId,
-  });
+      console.log("Extracted QR values:", {
+        qrRawId,
+        qrLink,
+        qrDisplayId,
+      });
 
-  if (!qrRawId || !qrLink) {
-    console.log("Skipping line item because QR values were missing.");
-    continue;
-  }
+      if (!qrRawId || !qrLink) {
+        console.log("Skipping line item because QR values were missing.");
+        continue;
+      }
 
-  const redirectPath = `/qr/${qrRawId}`;
+      const existingQr = await prisma.qrCode.findUnique({
+        where: { qrCode: qrRawId },
+      });
 
-  await createOrUpdateRedirect(admin, redirectPath, PLACEHOLDER_TARGET_URL);
+      if (!existingQr) {
+        console.warn(`Reserved QR not found in database for ${qrRawId}. Skipping for now.`);
+        continue;
+      }
 
-  await createCustomerQrMetaobject({
-    admin,
-    qrId: qrRawId,
-    qrLink,
-    customerId,
-    customerEmail,
-    orderName,
-  });
+      if (existingQr.orderLineItemId && existingQr.orderLineItemId === orderLineItemId) {
+        console.log(`Skipping duplicate webhook processing for ${qrRawId}.`);
+        continue;
+      }
 
-  console.log(`Created QR setup for order ${orderName}: ${qrRawId} (${shop})`);
-}
+      const redirectPath = existingQr.qrPath || `/qr/${qrRawId}`;
+
+      const redirectResult = await createOrUpdateRedirect(
+        admin,
+        redirectPath,
+        PLACEHOLDER_TARGET_URL
+      );
+
+      const metaobject = await createCustomerQrMetaobject({
+        admin,
+        qrId: qrRawId,
+        qrLink,
+        customerId,
+        customerEmail,
+        orderName,
+      });
+
+      await prisma.qrCode.update({
+        where: { id: existingQr.id },
+        data: {
+          orderId,
+          orderLineItemId,
+          customerId: customerId || null,
+          customerEmail: customerEmail || null,
+          publicUrl: qrLink || existingQr.publicUrl,
+          metaobjectId: metaobject?.id || null,
+          metaobjectHandle: metaobject?.handle || null,
+          redirectGid: redirectResult?.id || null,
+          status: "PENDING",
+        },
+      });
+
+      console.log(`Created QR setup for order ${orderName}: ${qrRawId} (${shop})`);
+    }
 
     return data({ ok: true });
   } catch (error) {
     console.error("orders/create webhook error:", error);
-    return data({ ok: false, error: error?.message || "Webhook failed" }, { status: 500 });
+    return data(
+      { ok: false, error: error?.message || "Webhook failed" },
+      { status: 500 }
+    );
   }
 }
