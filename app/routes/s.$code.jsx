@@ -36,7 +36,7 @@ function getDeviceType(userAgent = "") {
 export async function loader({ request, params }) {
   await authenticate.public.appProxy(request);
 
-  const code = params.code;
+  const code = params.code?.toUpperCase();
 
   if (!code) {
     throw new Response("Missing QR code", { status: 400 });
