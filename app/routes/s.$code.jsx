@@ -74,6 +74,9 @@ export async function loader({ request, params }) {
       qrPath: qrRecord.qrPath,
       qrCodeValue: qrRecord.qrCode
     },
+
+
+
     create: {
       qrCodeId: qrRecord.id,
       qrCodeValue: qrRecord.qrCode,
@@ -84,6 +87,8 @@ export async function loader({ request, params }) {
       lastScannedAt: now
     }
   });
+
+console.log("QrAnalytics upsert result:", analytics);
 
   let isUnique = false;
 
@@ -106,6 +111,8 @@ export async function loader({ request, params }) {
       }
     });
 
+console.log("QrScanEvent unique row created");
+
     isUnique = true;
   } catch (error) {
     if (error.code === "P2002") {
@@ -125,7 +132,9 @@ export async function loader({ request, params }) {
           ipHash,
           deviceType
         }
+	
       });
+console.log("QrScanEvent repeat row created");
     } else {
       throw error;
     }
@@ -145,6 +154,11 @@ export async function loader({ request, params }) {
     }
   });
 
+const finalAnalytics = await prisma.qrAnalytics.findUnique({
+  where: { qrCodeId: qrRecord.id }
+});
+console.log("Final analytics row:", finalAnalytics);
+
   await prisma.qrCode.update({
     where: { id: qrRecord.id },
     data: {
@@ -152,6 +166,11 @@ export async function loader({ request, params }) {
       lastScannedAt: now
     }
   });
+
+const finalQrCode = await prisma.qrCode.findUnique({
+  where: { id: qrRecord.id }
+});
+console.log("Final QrCode row:", finalQrCode);
 
   return redirect(qrRecord.targetUrl, 302);
 }
