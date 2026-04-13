@@ -20,7 +20,7 @@ function generateQrId(length = 6) {
 export async function generateUniqueQrReservation(baseUrl) {
   for (let attempt = 0; attempt < 10; attempt++) {
     const qrId = generateQrId();
-    const qrPath = `/qr/${qrId}`;
+    const qrPath = `/apps/qr-links/s/${qrId}`;
     const qrPublicUrl = `${baseUrl}${qrPath}`;
 
     const existing = await prisma.qrCode.findUnique({
