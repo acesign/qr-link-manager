@@ -161,7 +161,6 @@ model QrScanEvent {
 
   
   @@unique([uniqueKey])
-  @@unique([qrCodeValue, visitorKey, scanDate])
   @@index([qrAnalyticsId])
   @@index([qrCodeId])
   @@index([qrCodeValue])
