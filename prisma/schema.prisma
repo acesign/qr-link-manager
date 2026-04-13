@@ -1,84 +1,74 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
 
 model QrReservation {
-  id           String   @id @default(cuid())
-  qrId         String   @unique
-  qrPath       String   @unique
-  qrPublicUrl  String   @unique
-  status       String   @default("reserved")
-  customerId   String?
+  id            String    @id @default(cuid())
+  qrId          String    @unique
+  qrPath        String    @unique
+  qrPublicUrl   String    @unique
+  status        String    @default("reserved")
+  customerId    String?
   customerEmail String?
-  sessionId    String?
-  cartToken    String?
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  sessionId     String?
+  cartToken     String?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model QrCode {
-  id                String   @id @default(cuid())
-  shop              String
-  qrCode            String   @unique
-  qrDisplayCode     String?
-  qrPath            String   @unique
-  publicUrl         String?
-
-  status            QrStatus @default(RESERVED)
-
-  reservationId     String?  @unique
-  orderId           String?
-  orderName         String?
-  orderLineItemId   String?
-  customerId        String?
-  customerEmail     String?
-
-  targetUrl         String?
-  redirectGid       String?
-  metaobjectId      String?
-  metaobjectHandle  String?
-
-  reservedAt        DateTime?
-  activatedAt       DateTime?
-  lastScannedAt     DateTime?
-  scanCount         Int      @default(0)
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  scans             QrScan[]
+  id               String    @id @default(cuid())
+  shop             String
+  qrCode           String    @unique
+  qrDisplayCode    String?
+  qrPath           String    @unique
+  publicUrl        String?
+  status           QrStatus  @default(RESERVED)
+  reservationId    String?   @unique
+  orderId          String?
+  orderName        String?
+  orderLineItemId  String?
+  customerId       String?
+  customerEmail    String?
+  targetUrl        String?
+  redirectGid      String?
+  metaobjectId     String?
+  metaobjectHandle String?
+  reservedAt       DateTime?
+  activatedAt      DateTime?
+  lastScannedAt    DateTime?
+  scanCount        Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  scans            QrScan[]
+  analytics        QrAnalytics?
+  analyticsEvents  QrScanEvent[]
 
   @@index([shop, orderId])
   @@index([shop, customerId])
@@ -87,12 +77,12 @@ model QrCode {
 }
 
 model ProcessedWebhook {
-  id               String   @id @default(cuid())
-  shop             String
-  topic            String
-  webhookId        String
-  orderId          String?
-  processedAt      DateTime @default(now())
+  id          String   @id @default(cuid())
+  shop        String
+  topic       String
+  webhookId   String
+  orderId     String?
+  processedAt DateTime @default(now())
 
   @@unique([shop, webhookId])
   @@index([shop, topic, orderId])
@@ -108,7 +98,6 @@ model QrScan {
   utmSource   String?
   utmMedium   String?
   utmCampaign String?
-
   qrCode      QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
 
   @@index([qrCodeId, scannedAt])
@@ -120,4 +109,63 @@ enum QrStatus {
   ACTIVE
   DISABLED
   EXPIRED
+}
+
+model QrAnalytics {
+  id              String    @id @default(cuid())
+  qrCodeId        String    @unique
+  qrCodeValue     String    @unique
+  qrPath          String?   @unique
+  totalScans      Int       @default(0)
+  uniqueScanCount Int       @default(0)
+  firstScannedAt  DateTime?
+  lastScannedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  qrCode          QrCode        @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  scanEvents      QrScanEvent[]
+
+  @@index([lastScannedAt])
+  @@index([totalScans])
+}
+
+model QrScanEvent {
+  id             String      @id @default(cuid())
+  qrAnalyticsId  String
+  qrCodeId       String
+  qrCodeValue    String
+  qrPath         String?
+  scannedAt      DateTime    @default(now())
+  scanDate       String
+  visitorKey     String
+  uniqueKey      String?
+  isUnique       Boolean     @default(false)
+
+  userAgent      String?
+  referer        String?
+  ipHash         String?
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+
+  country        String?
+  region         String?
+  city           String?
+  deviceType     String?
+
+  createdAt      DateTime    @default(now())
+
+  qrAnalytics    QrAnalytics @relation(fields: [qrAnalyticsId], references: [id], onDelete: Cascade)
+  qrCode         QrCode      @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+
+  
+  @@unique([uniqueKey])
+  @@unique([qrCodeValue, visitorKey, scanDate])
+  @@index([qrAnalyticsId])
+  @@index([qrCodeId])
+  @@index([qrCodeValue])
+  @@index([scannedAt])
+  @@index([visitorKey])
+  @@index([qrCodeValue, scannedAt])
 }
