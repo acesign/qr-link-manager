@@ -1,5 +1,6 @@
 import { data } from "react-router";
 import shopify from "../shopify.server";
+import prisma from "../db.server";
 
 export async function action({ request }) {
   try {
@@ -121,6 +122,31 @@ const { admin } = await shopify.unauthenticated.admin(shop);
         { status: 400 }
       );
     }
+
+// 2) Sync to QrCode table (NEW SYSTEM SOURCE OF TRUTH)
+try {
+  const qrCodeRecord = await prisma.qrCode.findFirst({
+    where: {
+      metaobjectHandle: handle,
+      shop,
+    },
+  });
+
+  if (qrCodeRecord) {
+    await prisma.qrCode.update({
+      where: { id: qrCodeRecord.id },
+      data: {
+        targetUrl: parsedUrl.toString(),
+      },
+    });
+
+    console.log("QrCode targetUrl updated:", qrCodeRecord.qrCode);
+  } else {
+    console.warn("No QrCode found for handle:", handle);
+  }
+} catch (dbError) {
+  console.error("Failed to sync QrCode targetUrl:", dbError);
+}
 
     // 2) Build the Shopify redirect path
     // Adjust this if your actual QR path format is different.
