@@ -54,7 +54,8 @@ export async function loader({ request, params }) {
   }
 
   if (!qrRecord.targetUrl) {
-    throw new Response("QR code has no destination URL", { status: 404 });
+    const fallbackUrl = "https://explore.homes/pages/livelink-qr-setup-1";
+    const destinationUrl = qrRecord.targetUrl || fallbackUrl;
   }
 
   const userAgent = request.headers.get("user-agent") || "";
@@ -172,5 +173,5 @@ const finalQrCode = await prisma.qrCode.findUnique({
 });
 console.log("Final QrCode row:", finalQrCode);
 
-  return redirect(qrRecord.targetUrl, 302);
+  return redirect(destinationUrl, 302);
 }
