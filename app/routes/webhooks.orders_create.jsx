@@ -226,13 +226,33 @@ export async function action({ request }) {
 
     for (const item of lineItems) {
       console.log("Webhook line item properties:", JSON.stringify(item?.properties, null, 2));
+	const properties = item?.properties || {};
 
-      const properties = item?.properties || {};
-      const qrRawId = normalizeQrId(getPropertyValue(properties, "qr_raw_id"));
-      const qrLink = getPropertyValue(properties, "qr_link");
-      const qrDisplayId = getPropertyValue(properties, "qr_id");
-      const orderLineItemId = item?.id ? String(item.id) : "";
+function getAnyProperty(properties, names) {
+  for (const name of names) {
+    const value = getPropertyValue(properties, name);
+    if (value) return value;
+  }
+  return "";
+}
 
+let qrRawId = normalizeQrId(
+  getAnyProperty(properties, ["qr_raw_id", "QR Raw ID", "QR Raw"])
+);
+
+let qrLink = getAnyProperty(properties, ["qr_link", "QR", "QR Link"]);
+
+const qrDisplayId = getAnyProperty(properties, ["qr_id", "QR ID"]);
+
+if (!qrRawId && qrLink) {
+  const match = qrLink.match(/\/(?:qr|apps\/qr-links\/s)\/([A-Za-z0-9-]+)$/);
+  if (match) {
+    qrRawId = normalizeQrId(match[1]);
+  }
+}
+
+const orderLineItemId = item?.id ? String(item.id) : "";
+      
       console.log("Extracted QR values:", {
         qrRawId,
         qrLink,
