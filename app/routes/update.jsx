@@ -12,21 +12,27 @@ export async function action({ request }) {
       url.searchParams.get("shop") ||
       url.searchParams.get("logged_in_customer_shop_domain");
 
+    const loggedInCustomerId = String(
+      url.searchParams.get("logged_in_customer_id") || ""
+    ).trim();
+
     if (!shop) {
       return data({ error: "Missing shop context" }, { status: 400 });
     }
 
-const { admin } = await shopify.unauthenticated.admin(shop);
-
+    if (!loggedInCustomerId) {
+      return data({ error: "Missing customer context" }, { status: 401 });
+    }
 
     const formData = await request.formData();
-    const handle = String(formData.get("metaobject_handle") || "").trim();
-    const newUrl = String(formData.get("qr_target_url") || "").trim();
-    const customerEmail = String(formData.get("customer_email") || "")
+    const qrCode = String(formData.get("qr_code") || "")
       .trim()
-      .toLowerCase();
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
 
-    if (!handle || !newUrl || !customerEmail) {
+    const newUrl = String(formData.get("qr_target_url") || "").trim();
+
+    if (!qrCode || !newUrl) {
       return data({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -40,234 +46,36 @@ const { admin } = await shopify.unauthenticated.admin(shop);
       return data({ error: "Please enter a valid URL." }, { status: 400 });
     }
 
-    const lookupResponse = await admin.graphql(
-      `#graphql
-        query GetMetaobjectByHandle($handle: MetaobjectHandleInput!) {
-          metaobjectByHandle(handle: $handle) {
-            id
-            handle
-            fields {
-              key
-              value
-            }
-          }
-        }
-      `,
-      {
-        variables: {
-          handle: {
-            type: "customer_qr_links",
-            handle,
-          },
-        },
-      }
-    );
+    const qrRecord = await prisma.qrCode.findFirst({
+      where: {
+        shop,
+        qrCode,
+        customerId: loggedInCustomerId,
+	status: "ACTIVE",
+      },
+      select: {
+        id: true,
+        qrCode: true,
+      },
+    });
 
-    const lookupJson = await lookupResponse.json();
-    const metaobject = lookupJson?.data?.metaobjectByHandle;
-
-    if (!metaobject) {
-      return data({ error: "QR link not found" }, { status: 404 });
+    if (!qrRecord) {
+      return data({ error: "QR link not found." }, { status: 404 });
     }
 
-    const fieldMap = Object.fromEntries(
-      (metaobject.fields || []).map((f) => [f.key, f.value])
-    );
-
-    const ownerEmail = String(fieldMap.customer_email || "")
-      .trim()
-      .toLowerCase();
-
-    if (!ownerEmail || ownerEmail !== customerEmail) {
-      return data({ error: "Unauthorized update attempt" }, { status: 403 });
-    }
-
-    // 1) Update the metaobject
-    const updateResponse = await admin.graphql(
-      `#graphql
-        mutation UpdateMetaobject($id: ID!, $metaobject: MetaobjectUpdateInput!) {
-          metaobjectUpdate(id: $id, metaobject: $metaobject) {
-            metaobject {
-              id
-              handle
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `,
-      {
-        variables: {
-          id: metaobject.id,
-          metaobject: {
-            fields: [
-              {
-                key: "qr_target_url",
-                value: parsedUrl.toString(),
-              },
-            ],
-          },
-        },
-      }
-    );
-
-    const updateJson = await updateResponse.json();
-    const userErrors = updateJson?.data?.metaobjectUpdate?.userErrors || [];
-
-    if (userErrors.length > 0) {
-      return data(
-        { error: userErrors[0].message || "Update failed." },
-        { status: 400 }
-      );
-    }
-
-// 2) Sync to QrCode table (NEW SYSTEM SOURCE OF TRUTH)
-try {
-  const qrCodeRecord = await prisma.qrCode.findFirst({
-    where: {
-      metaobjectHandle: handle,
-      shop,
-    },
-  });
-
-  if (qrCodeRecord) {
     await prisma.qrCode.update({
-      where: { id: qrCodeRecord.id },
+      where: { id: qrRecord.id },
       data: {
         targetUrl: parsedUrl.toString(),
       },
     });
 
-    console.log("QrCode targetUrl updated:", qrCodeRecord.qrCode);
-  } else {
-    console.warn("No QrCode found for handle:", handle);
-  }
-} catch (dbError) {
-  console.error("Failed to sync QrCode targetUrl:", dbError);
-}
-
-    // 2) Build the Shopify redirect path
-    // Adjust this if your actual QR path format is different.
-    const redirectPath = String(fieldMap.qr_redirect_path || "").trim();
-	if (!redirectPath || !redirectPath.startsWith("/")) {
-      return data({ error: "Invalid QR redirect path." }, { status: 400 });
-    }
-
-    // 3) Look up existing Shopify URL Redirect by path
-    const redirectLookupResponse = await admin.graphql(
-      `#graphql
-        query FindRedirect($query: String!) {
-          urlRedirects(first: 1, query: $query) {
-            nodes {
-              id
-              path
-              target
-            }
-          }
-        }
-      `,
-      {
-        variables: {
-          query: `path:${redirectPath}`,
-        },
-      }
-    );
-
-    const redirectLookupJson = await redirectLookupResponse.json();
-    const existingRedirect =
-      redirectLookupJson?.data?.urlRedirects?.nodes?.[0] || null;
-
-    // 4) Update existing redirect OR create a new one
-    if (existingRedirect?.id) {
-      const redirectUpdateResponse = await admin.graphql(
-        `#graphql
-          mutation UpdateRedirect($id: ID!, $urlRedirect: UrlRedirectInput!) {
-            urlRedirectUpdate(id: $id, urlRedirect: $urlRedirect) {
-              urlRedirect {
-                id
-                path
-                target
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }
-        `,
-        {
-          variables: {
-            id: existingRedirect.id,
-            urlRedirect: {
-              path: redirectPath,
-              target: parsedUrl.toString(),
-            },
-          },
-        }
-      );
-
-      const redirectUpdateJson = await redirectUpdateResponse.json();
-      const redirectErrors =
-        redirectUpdateJson?.data?.urlRedirectUpdate?.userErrors || [];
-
-      if (redirectErrors.length > 0) {
-        return data(
-          {
-            error:
-              redirectErrors[0].message || "Redirect update failed.",
-          },
-          { status: 400 }
-        );
-      }
-    } else {
-      const redirectCreateResponse = await admin.graphql(
-        `#graphql
-          mutation CreateRedirect($urlRedirect: UrlRedirectInput!) {
-            urlRedirectCreate(urlRedirect: $urlRedirect) {
-              urlRedirect {
-                id
-                path
-                target
-              }
-              userErrors {
-                field
-                message
-              }
-            }
-          }
-        `,
-        {
-          variables: {
-            urlRedirect: {
-              path: redirectPath,
-              target: parsedUrl.toString(),
-            },
-          },
-        }
-      );
-
-      const redirectCreateJson = await redirectCreateResponse.json();
-      const redirectErrors =
-        redirectCreateJson?.data?.urlRedirectCreate?.userErrors || [];
-
-      if (redirectErrors.length > 0) {
-        return data(
-          {
-            error:
-              redirectErrors[0].message || "Redirect creation failed.",
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-  return data({
-  success: true,
-  message: "QR link updated successfully.",
-});
-
+    return data({
+      success: true,
+      message: "QR link updated successfully.",
+      qrCode: qrRecord.qrCode,
+      targetUrl: parsedUrl.toString(),
+    });
   } catch (error) {
     console.error("QR update error:", error);
     return data(
