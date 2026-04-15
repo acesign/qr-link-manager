@@ -12,19 +12,27 @@ export async function action({ request }) {
       url.searchParams.get("shop") ||
       url.searchParams.get("logged_in_customer_shop_domain");
 
-    const loggedInCustomerId = String(
-      url.searchParams.get("logged_in_customer_id") || ""
-    ).trim();
+  if (!shop) {
+  return data({ error: "Missing shop context" }, { status: 400 });
+}
 
-    if (!shop) {
-      return data({ error: "Missing shop context" }, { status: 400 });
-    }
+const formData = await request.formData();
 
-    if (!loggedInCustomerId) {
-      return data({ error: "Missing customer context" }, { status: 401 });
-    }
+const proxyCustomerId = String(
+  url.searchParams.get("logged_in_customer_id") || ""
+).trim();
 
-    const formData = await request.formData();
+const postedCustomerId = String(
+  formData.get("customer_id") || ""
+).trim();
+
+const loggedInCustomerId = proxyCustomerId || postedCustomerId;
+
+if (!loggedInCustomerId) {
+  return data({ error: "Missing customer context" }, { status: 401 });
+}  
+
+    
     const qrCode = String(formData.get("qr_code") || "")
       .trim()
       .toUpperCase()
@@ -51,7 +59,6 @@ export async function action({ request }) {
         shop,
         qrCode,
         customerId: loggedInCustomerId,
-	status: "ACTIVE",
       },
       select: {
         id: true,
