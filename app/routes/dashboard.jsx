@@ -28,7 +28,7 @@ export async function loader({ request }) {
       where: {
         shop,
         customerId: loggedInCustomerId,
-        status: "ACTIVE",
+
       },
       select: {
         qrCode: true,
