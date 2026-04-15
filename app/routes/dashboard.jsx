@@ -67,8 +67,8 @@ export async function loader({ request }) {
   uniqueScans7d,
   totalScans30d,
   uniqueScans30d,
-  deviceGroups,
-  locationGroups
+  deviceGroupsRaw,
+  locationGroupsRaw
 ] = await Promise.all([
   prisma.qrScanEvent.count({
     where: {
@@ -115,11 +115,6 @@ export async function loader({ request }) {
     _count: {
       deviceType: true,
     },
-    orderBy: {
-      _count: {
-        deviceType: "desc",
-      },
-    },
   }),
   prisma.qrScanEvent.groupBy({
     by: ["country", "region", "city"],
@@ -129,13 +124,16 @@ export async function loader({ request }) {
     _count: {
       country: true,
     },
-    orderBy: {
-      _count: {
-        country: "desc",
-      },
-    },
   }),
-]); 
+]);
+
+const deviceGroups = [...deviceGroupsRaw].sort(
+  (a, b) => (b._count.deviceType ?? 0) - (a._count.deviceType ?? 0)
+);
+
+const locationGroups = [...locationGroupsRaw].sort(
+  (a, b) => (b._count.country ?? 0) - (a._count.country ?? 0)
+);
 
         const topDevice = deviceGroups?.[0]
           ? {
@@ -178,7 +176,7 @@ export async function loader({ request }) {
       records,
     });
   } catch (error) {
-    console.error("Dashboard loader error:", error);
+    console.error("Dashboard loader error:", error, error?.stack);
     return data(
       { error: error?.message || "Unexpected server error" },
       { status: 500 }
