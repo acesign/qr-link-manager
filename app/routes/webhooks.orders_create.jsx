@@ -3,7 +3,6 @@ import shopify from "../shopify.server";
 import prisma from "../db.server";
 
 const PLACEHOLDER_TARGET_URL = "https://explore.homes/pages/livelink-qr-setup-1";
-const METAOBJECT_TYPE = "customer_qr_links";
 
 function getPropertyValue(properties, targetName) {
   if (!properties) return "";
@@ -24,11 +23,6 @@ function getPropertyValue(properties, targetName) {
 
 function normalizeQrId(qrId) {
   return String(qrId || "").replace(/-/g, "").trim().toUpperCase();
-}
-
-function buildCustomerGid(customerId) {
-  if (!customerId) return null;
-  return `gid://shopify/Customer/${customerId}`;
 }
 
 async function findExistingRedirect(admin, redirectPath) {
@@ -132,67 +126,12 @@ async function createOrUpdateRedirect(admin, redirectPath, targetUrl) {
   return createJson?.data?.urlRedirectCreate?.urlRedirect;
 }
 
-  const redirectPath = `/qr/${qrId}`;
-
-  const fields = [
-    { key: "qr_id", value: qrId },
-    { key: "qr_redirect_path", value: redirectPath },
-    { key: "qr_public_url", value: qrLink },
-    { key: "qr_target_url", value: PLACEHOLDER_TARGET_URL },
-    { key: "status", value: "pending" },
-  ];
-
-  if (customerEmail) {
-    fields.push({ key: "customer_email", value: customerEmail });
+function getAnyProperty(properties, names) {
+  for (const name of names) {
+    const value = getPropertyValue(properties, name);
+    if (value) return value;
   }
-
-  if (customerId) {
-    fields.push({ key: "customer_reference", value: buildCustomerGid(customerId) });
-  }
-
-  if (orderName) {
-    fields.push({ key: "order_reference", value: orderName });
-  }
-
-  const response = await admin.graphql(
-    `#graphql
-      mutation CreateMetaobject($metaobject: MetaobjectCreateInput!) {
-        metaobjectCreate(metaobject: $metaobject) {
-          metaobject {
-            id
-            handle
-            type
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `,
-    {
-      variables: {
-        metaobject: {
-          type: METAOBJECT_TYPE,
-          fields,
-          capabilities: {
-            publishable: {
-              status: "ACTIVE",
-            },
-          },
-        },
-      },
-    }
-  );
-
-  const json = await response.json();
-  const errors = json?.data?.metaobjectCreate?.userErrors || [];
-
-  if (errors.length > 0) {
-    throw new Error(errors[0].message || "Metaobject creation failed.");
-  }
-
-  return json?.data?.metaobjectCreate?.metaobject;
+  return "";
 }
 
 export async function action({ request }) {
@@ -218,33 +157,26 @@ export async function action({ request }) {
 
     for (const item of lineItems) {
       console.log("Webhook line item properties:", JSON.stringify(item?.properties, null, 2));
-	const properties = item?.properties || {};
 
-function getAnyProperty(properties, names) {
-  for (const name of names) {
-    const value = getPropertyValue(properties, name);
-    if (value) return value;
-  }
-  return "";
-}
+      const properties = item?.properties || {};
 
-let qrRawId = normalizeQrId(
-  getAnyProperty(properties, ["qr_raw_id", "QR Raw ID", "QR Raw"])
-);
+      let qrRawId = normalizeQrId(
+        getAnyProperty(properties, ["qr_raw_id", "QR Raw ID", "QR Raw"])
+      );
 
-let qrLink = getAnyProperty(properties, ["qr_link", "QR", "QR Link"]);
+      let qrLink = getAnyProperty(properties, ["qr_link", "QR", "QR Link"]);
 
-const qrDisplayId = getAnyProperty(properties, ["qr_id", "QR ID"]);
+      const qrDisplayId = getAnyProperty(properties, ["qr_id", "QR ID"]);
 
-if (!qrRawId && qrLink) {
-  const match = qrLink.match(/\/(?:qr|apps\/qr-links\/s)\/([A-Za-z0-9-]+)$/);
-  if (match) {
-    qrRawId = normalizeQrId(match[1]);
-  }
-}
+      if (!qrRawId && qrLink) {
+        const match = qrLink.match(/\/(?:qr|apps\/qr-links\/s)\/([A-Za-z0-9-]+)$/);
+        if (match) {
+          qrRawId = normalizeQrId(match[1]);
+        }
+      }
 
-const orderLineItemId = item?.id ? String(item.id) : "";
-      
+      const orderLineItemId = item?.id ? String(item.id) : "";
+
       console.log("Extracted QR values:", {
         qrRawId,
         qrLink,
@@ -278,7 +210,6 @@ const orderLineItemId = item?.id ? String(item.id) : "";
         PLACEHOLDER_TARGET_URL
       );
 
-      
       await prisma.qrCode.update({
         where: { id: existingQr.id },
         data: {
@@ -287,7 +218,7 @@ const orderLineItemId = item?.id ? String(item.id) : "";
           customerId: customerId || null,
           customerEmail: customerEmail || null,
           publicUrl: qrLink || existingQr.publicUrl,
-	  targetUrl: https://explore.homes/pages/livelink-qr-setup-1,
+          targetUrl: PLACEHOLDER_TARGET_URL,
           redirectGid: redirectResult?.id || null,
           status: "PENDING",
         },
