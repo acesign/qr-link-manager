@@ -132,14 +132,6 @@ async function createOrUpdateRedirect(admin, redirectPath, targetUrl) {
   return createJson?.data?.urlRedirectCreate?.urlRedirect;
 }
 
-async function createCustomerQrMetaobject({
-  admin,
-  qrId,
-  qrLink,
-  customerId,
-  customerEmail,
-  orderName,
-}) {
   const redirectPath = `/qr/${qrId}`;
 
   const fields = [
@@ -286,15 +278,7 @@ const orderLineItemId = item?.id ? String(item.id) : "";
         PLACEHOLDER_TARGET_URL
       );
 
-      const metaobject = await createCustomerQrMetaobject({
-        admin,
-        qrId: qrRawId,
-        qrLink,
-        customerId,
-        customerEmail,
-        orderName,
-      });
-
+      
       await prisma.qrCode.update({
         where: { id: existingQr.id },
         data: {
@@ -303,8 +287,7 @@ const orderLineItemId = item?.id ? String(item.id) : "";
           customerId: customerId || null,
           customerEmail: customerEmail || null,
           publicUrl: qrLink || existingQr.publicUrl,
-          metaobjectId: metaobject?.id || null,
-          metaobjectHandle: metaobject?.handle || null,
+	  targetUrl: https://explore.homes/pages/livelink-qr-setup-1,
           redirectGid: redirectResult?.id || null,
           status: "PENDING",
         },
