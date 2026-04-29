@@ -12,27 +12,24 @@ export async function action({ request }) {
       url.searchParams.get("shop") ||
       url.searchParams.get("logged_in_customer_shop_domain");
 
-  if (!shop) {
-  return data({ error: "Missing shop context" }, { status: 400 });
-}
+    if (!shop) {
+      return data({ error: "Missing shop context" }, { status: 400 });
+    }
 
-const formData = await request.formData();
+    const formData = await request.formData();
 
-const proxyCustomerId = String(
-  url.searchParams.get("logged_in_customer_id") || ""
-).trim();
+    const proxyCustomerId = String(
+      url.searchParams.get("logged_in_customer_id") || ""
+    ).trim();
 
-const postedCustomerId = String(
-  formData.get("customer_id") || ""
-).trim();
+    const postedCustomerId = String(formData.get("customer_id") || "").trim();
 
-const loggedInCustomerId = proxyCustomerId || postedCustomerId;
+    const loggedInCustomerId = proxyCustomerId || postedCustomerId;
 
-if (!loggedInCustomerId) {
-  return data({ error: "Missing customer context" }, { status: 401 });
-}  
+    if (!loggedInCustomerId) {
+      return data({ error: "Missing customer context" }, { status: 401 });
+    }
 
-    
     const qrCode = String(formData.get("qr_code") || "")
       .trim()
       .toUpperCase()
@@ -47,6 +44,7 @@ if (!loggedInCustomerId) {
     let parsedUrl;
     try {
       parsedUrl = new URL(newUrl);
+
       if (!["http:", "https:"].includes(parsedUrl.protocol)) {
         throw new Error("Invalid protocol");
       }
@@ -63,6 +61,7 @@ if (!loggedInCustomerId) {
       select: {
         id: true,
         qrCode: true,
+        qrPath: true,
       },
     });
 
@@ -70,16 +69,49 @@ if (!loggedInCustomerId) {
       return data({ error: "QR link not found." }, { status: 404 });
     }
 
-    await prisma.qrCode.update({
-      where: { id: qrRecord.id },
-      data: {
-        targetUrl: parsedUrl.toString(),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.qrCode.update({
+        where: { id: qrRecord.id },
+        data: {
+          targetUrl: parsedUrl.toString(),
+          scanCount: 0,
+          lastScannedAt: null,
+          activatedAt: null,
+          status: "PENDING",
+        },
+      });
+
+      await tx.qrScanEvent.deleteMany({
+        where: {
+          qrCodeId: qrRecord.id,
+        },
+      });
+
+      await tx.qrAnalytics.upsert({
+        where: { qrCodeId: qrRecord.id },
+        update: {
+          qrCodeValue: qrRecord.qrCode,
+          qrPath: qrRecord.qrPath || null,
+          totalScans: 0,
+          uniqueScanCount: 0,
+          firstScannedAt: null,
+          lastScannedAt: null,
+        },
+        create: {
+          qrCodeId: qrRecord.id,
+          qrCodeValue: qrRecord.qrCode,
+          qrPath: qrRecord.qrPath || null,
+          totalScans: 0,
+          uniqueScanCount: 0,
+          firstScannedAt: null,
+          lastScannedAt: null,
+        },
+      });
     });
 
     return data({
       success: true,
-      message: "QR link updated successfully.",
+      message: "QR link updated successfully. Analytics have been reset.",
       qrCode: qrRecord.qrCode,
       targetUrl: parsedUrl.toString(),
     });

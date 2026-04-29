@@ -169,22 +169,29 @@ export async function loader({ request, params }) {
     }
   }
 
-  try {
-    await prisma.qrCode.update({
-      where: { id: qrRecord.id },
-      data: {
-        scanCount: { increment: 1 },
-        lastScannedAt: now,
-      },
-    });
+ try {
+  const qrCodeUpdateData = {
+    scanCount: { increment: 1 },
+    lastScannedAt: now,
+  };
 
-    const finalQrCode = await prisma.qrCode.findUnique({
-      where: { id: qrRecord.id },
-    });
-    console.log("Final QrCode row:", finalQrCode);
-  } catch (qrCodeUpdateError) {
-    console.error("QrCode update failed:", qrCodeUpdateError);
+  if (qrRecord.status === "PENDING") {
+    qrCodeUpdateData.status = "ACTIVE";
+    qrCodeUpdateData.activatedAt = now;
   }
+
+  await prisma.qrCode.update({
+    where: { id: qrRecord.id },
+    data: qrCodeUpdateData,
+  });
+
+  const finalQrCode = await prisma.qrCode.findUnique({
+    where: { id: qrRecord.id },
+  });
+  console.log("Final QrCode row:", finalQrCode);
+} catch (qrCodeUpdateError) {
+  console.error("QrCode update failed:", qrCodeUpdateError);
+} 
 
   return redirect(destinationUrl, 302);
 }
