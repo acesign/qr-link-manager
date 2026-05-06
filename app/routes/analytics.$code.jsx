@@ -1,4 +1,5 @@
-import { data } from "react-router";
+import { data, useLoaderData } from "react-router";
+import { useEffect } from "react";
 import prisma from "../db.server";
 import shopify from "../shopify.server";
 
@@ -63,8 +64,57 @@ import { useLoaderData } from "react-router";
 export default function AnalyticsPage() {
   const { qrCode, totalScans, uniqueScans, events } = useLoaderData();
 
+  useEffect(() => {
+    if (!window.Chart) {
+      console.error("Chart.js is not loaded.");
+      return;
+    }
+
+    const canvas = document.getElementById("scanChart");
+    if (!canvas) return;
+
+    const existingChart = window.Chart.getChart(canvas);
+    if (existingChart) {
+      existingChart.destroy();
+    }
+
+    const labels = events.map((event) => event.scanDate);
+    const totals = events.map((event) => event._count.scanDate);
+
+    new window.Chart(canvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Total Scans",
+            data: totals,
+            borderWidth: 2,
+            tension: 0.3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: true,
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0,
+            },
+          },
+        },
+      },
+    });
+  }, [events]);
+
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto" }}>
+    <div style={{ maxWidth: 900, margin: "40px auto", padding: "24px" }}>
       <h1>QR Analytics: {qrCode}</h1>
 
       <div style={{ display: "flex", gap: 20, marginBottom: 20 }}>
@@ -73,25 +123,6 @@ export default function AnalyticsPage() {
       </div>
 
       <canvas id="scanChart" height="100"></canvas>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            const ctx = document.getElementById('scanChart').getContext('2d');
-            new Chart(ctx, {
-              type: 'line',
-              data: {
-                labels: ${JSON.stringify(events.map(e => e.scanDate))},
-                datasets: [{
-                  label: 'Scans',
-                  data: ${JSON.stringify(events.map(e => e._count.scanDate))},
-                  borderWidth: 2
-                }]
-              }
-            });
-          `,
-        }}
-      />
     </div>
   );
 }
