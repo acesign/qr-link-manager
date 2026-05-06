@@ -59,7 +59,6 @@ export async function loader({ request, params }) {
   });
 }
 
-import { useLoaderData } from "react-router";
 
 export default function AnalyticsPage() {
   const { qrCode, totalScans, uniqueScans, events } = useLoaderData();
