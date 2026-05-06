@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
   <div style={{ display: "flex", alignItems: "end", gap: 10, height: 180 }}>
     {trend7d.map((day) => {
       const height = Math.max((day.totalScans / maxScans) * 140, 4);
-
+	 const maxScans = Math.max(...trend7d.map((day) => day.totalScans), 1);
       return (
         <div
           key={day.scanDate}
@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
   </div>
 </div>
 
-      const maxScans = Math.max(...trend7d.map((day) => day.totalScans), 1);
+     
     </div>
   );
 }
