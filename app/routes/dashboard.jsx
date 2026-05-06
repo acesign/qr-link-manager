@@ -48,6 +48,7 @@ export async function loader({ request }) {
           select: {
             totalScans: true,
             uniqueScanCount: true,
+	    firstScannedAt: true,
             lastScannedAt: true,
           },
         },
@@ -158,6 +159,7 @@ const locationGroups = [...locationGroupsRaw].sort(
           orderName: row.orderName || null,
           totalScans: row.analytics?.totalScans ?? 0,
           uniqueScanCount: row.analytics?.uniqueScanCount ?? 0,
+	  firstScannedAt: row.analytics?.firstScannedAt ?? null,
           lastScannedAt: row.analytics?.lastScannedAt ?? null,
           miniAnalytics: {
             	totalScans7d,
