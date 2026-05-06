@@ -61,7 +61,7 @@ export async function loader({ request, params }) {
 
 
 export default function AnalyticsPage() {
-  const { qrCode, totalScans, uniqueScans, events } = useLoaderData();
+  const { qrCode, totalScans, uniqueScans, trend7d } = useLoaderData();
 
   useEffect(() => {
     if (!window.Chart) {
@@ -113,15 +113,49 @@ export default function AnalyticsPage() {
   }, [events]);
 
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto", padding: "24px" }}>
-      <h1>QR Analytics: {qrCode}</h1>
+    <div style={{ marginTop: 24 }}>
+  <h2>7-Day Scan Trend</h2>
 
-      <div style={{ display: "flex", gap: 20, marginBottom: 20 }}>
-        <div>Total Scans: {totalScans}</div>
-        <div>Unique Scans: {uniqueScans}</div>
-      </div>
+  <div style={{ display: "flex", alignItems: "end", gap: 10, height: 180 }}>
+    {trend7d.map((day) => {
+      const height = Math.max((day.totalScans / maxScans) * 140, 4);
 
-      <canvas id="scanChart" height="100"></canvas>
+      return (
+        <div
+          key={day.scanDate}
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <div style={{ fontSize: 13 }}>{day.totalScans}</div>
+
+          <div
+            title={`${day.scanDate}: ${day.totalScans} scans`}
+            style={{
+              width: "100%",
+              maxWidth: 42,
+              height,
+              background: "#111",
+              borderRadius: 8,
+            }}
+          />
+
+          <div style={{ fontSize: 12, color: "#666" }}>
+            {new Date(day.scanDate).toLocaleDateString(undefined, {
+              weekday: "short",
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+      const maxScans = Math.max(...trend7d.map((day) => day.totalScans), 1);
     </div>
   );
 }
