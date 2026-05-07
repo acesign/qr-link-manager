@@ -70,6 +70,7 @@ export async function loader({ request, params }) {
     });
 
     const last7Days = buildLastNDays(7);
+	const last30Days = buildLastNDays(30);
 
     const eventMap = Object.fromEntries(
       events.map((event) => [event.scanDate, event._count.scanDate])
@@ -79,6 +80,11 @@ export async function loader({ request, params }) {
       scanDate: date,
       totalScans: eventMap[date] || 0,
     }));
+
+	const trend30d = last30Days.map((date) => ({
+  	scanDate: date,
+  	totalScans: eventMap[date] || 0,
+	}));
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -134,6 +140,7 @@ export async function loader({ request, params }) {
       totalScans30d,
       uniqueScans30d,
       trend7d,
+	trend30d,
     });
   } catch (error) {
     console.error("Analytics detail loader error:", error);
