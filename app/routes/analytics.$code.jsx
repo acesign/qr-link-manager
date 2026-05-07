@@ -80,6 +80,46 @@ export async function loader({ request, params }) {
       totalScans: eventMap[date] || 0,
     }));
 
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [
+      totalScans7d,
+      uniqueScans7d,
+      totalScans30d,
+      uniqueScans30d,
+    ] = await Promise.all([
+      prisma.qrScanEvent.count({
+        where: {
+          qrCodeId: qr.id,
+          scannedAt: { gte: sevenDaysAgo },
+        },
+      }),
+      prisma.qrScanEvent.count({
+        where: {
+          qrCodeId: qr.id,
+          scannedAt: { gte: sevenDaysAgo },
+          isUnique: true,
+        },
+      }),
+      prisma.qrScanEvent.count({
+        where: {
+          qrCodeId: qr.id,
+          scannedAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.qrScanEvent.count({
+        where: {
+          qrCodeId: qr.id,
+          scannedAt: { gte: thirtyDaysAgo },
+          isUnique: true,
+        },
+      }),
+    ]);
+
     return data({
       success: true,
       qrCode: qr.qrCode,
@@ -89,6 +129,10 @@ export async function loader({ request, params }) {
       uniqueScans: qr.analytics?.uniqueScanCount ?? 0,
       firstScannedAt: qr.analytics?.firstScannedAt ?? null,
       lastScannedAt: qr.analytics?.lastScannedAt ?? null,
+      totalScans7d,
+      uniqueScans7d,
+      totalScans30d,
+      uniqueScans30d,
       trend7d,
     });
   } catch (error) {
