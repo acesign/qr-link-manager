@@ -69,24 +69,34 @@ export async function loader({ request, params }) {
   let isUnique = false;
 
   try {
-    analytics = await prisma.qrAnalytics.upsert({
-      where: { qrCodeId: qrRecord.id },
-      update: {
-        totalScans: { increment: 1 },
-        lastScannedAt: now,
-        qrPath: qrRecord.qrPath,
-        qrCodeValue: qrRecord.qrCode,
-      },
-      create: {
-        qrCodeId: qrRecord.id,
-        qrCodeValue: qrRecord.qrCode,
-        qrPath: qrRecord.qrPath,
-        totalScans: 1,
-        uniqueScanCount: 0,
-        firstScannedAt: now,
-        lastScannedAt: now,
-      },
-    });
+
+  analytics = await prisma.qrAnalytics.upsert({
+  where: { qrCodeId: qrRecord.id },
+  update: {
+    totalScans: { increment: 1 },
+    lastScannedAt: now,
+    qrPath: qrRecord.qrPath,
+    qrCodeValue: qrRecord.qrCode,
+  },
+  create: {
+    qrCodeId: qrRecord.id,
+    qrCodeValue: qrRecord.qrCode,
+    qrPath: qrRecord.qrPath,
+    totalScans: 1,
+    uniqueScanCount: 0,
+    firstScannedAt: now,
+    lastScannedAt: now,
+  },
+});
+
+if (!analytics.firstScannedAt) {
+  analytics = await prisma.qrAnalytics.update({
+    where: { id: analytics.id },
+    data: {
+      firstScannedAt: now,
+    },
+  });
+}
 
     console.log("QrAnalytics upsert result:", analytics);
   } catch (err) {
